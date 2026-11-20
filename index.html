@@ -81,11 +81,15 @@ body[data-mode="gate"] #gate,body[data-mode="film"] #film{opacity:1;visibility:v
 #film:is([data-s="4"],[data-s="5"],[data-s="6"],[data-s="7"]) .pyr{transform:none}
 #film:is([data-s="4"],[data-s="5"],[data-s="6"],[data-s="7"]) .ring{opacity:1;transform:translate(-50%,38%)}
 #film.media :is(.glyphs,.pyr,.ring){opacity:0!important}
-.shot{position:absolute;inset:0;opacity:0;transition:opacity 1.4s ease;overflow:hidden}
+.shot,#fx{position:absolute;top:0;left:50%;width:min(100%,60vh);height:100%;transform:translateX(-50%);pointer-events:none}
+.shot{opacity:0;transition:opacity 1.4s ease;overflow:hidden}
 .shot[data-n="1"]{transition-duration:3.5s}
 .shot.on{opacity:1}
 .shot>*{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .shot.on>img{animation:kb var(--d,8s) linear both}
+.shot.gl>img{display:none}
+@media (max-aspect-ratio:941/1672){.shot>*{object-fit:contain}}
+@media (min-aspect-ratio:7/10){.shot,#fx{-webkit-mask-image:linear-gradient(to right,transparent,#000 9%,#000 91%,transparent);mask-image:linear-gradient(to right,transparent,#000 9%,#000 91%,transparent)}}
 @keyframes kb{from{transform:scale(var(--a,1)) translate(var(--ax,0),var(--ay,0))}to{transform:scale(var(--b,1.14)) translate(var(--bx,0),var(--by,0))}}
 .shade,.dim{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity 2.5s ease}
 .shade{background:linear-gradient(to bottom,rgba(7,5,13,.6),transparent 28%,transparent 52%,rgba(7,5,13,.88))}
@@ -208,11 +212,12 @@ footer{padding:20px 22px 72px;text-align:center}
 <!-- 2. Film -->
 <section id="film" class="layer" data-s="0">
   <video id="video" playsinline preload="none"></video>
-  <div class="shot" data-n="1" style="--d:9s;--a:1.02;--b:1.16"></div>
-  <div class="shot" data-n="2" style="--d:10s;--a:1.03;--b:1.22"></div>
-  <div class="shot" data-n="3" style="--d:10s;--a:1.04;--b:1.2;--by:2%"></div>
-  <div class="shot" data-n="4" style="--d:9s;--a:1.32;--b:1.02"></div>
-  <div class="shot" data-n="5" style="--d:8s;--a:1.04;--b:1.14"></div>
+  <div class="shot" data-n="1" style="--d:9s;--a:1;--b:1.05"></div>
+  <div class="shot" data-n="2" style="--d:10s;--a:1;--b:1.08"></div>
+  <div class="shot" data-n="3" style="--d:10s;--a:1;--b:1.05"></div>
+  <div class="shot" data-n="4" style="--d:9s;--a:1.07;--b:1"></div>
+  <div class="shot" data-n="5" style="--d:8s;--a:1;--b:1.045"></div>
+  <canvas id="fx"></canvas>
   <div class="glyphs col l" data-n="18"></div>
   <div class="glyphs col r" data-n="18"></div>
   <div class="glyphs row" data-n="7"></div>
@@ -319,6 +324,7 @@ const VOICE = 1.25, VO_TRIM = [1.1, 1.3, 1, 1.25, 1.45, 1];
 const MUSIC_LEVEL = [[0, .5], [13.6, .6], [22.4, .85], [37.4, .5]];
 const DUCK = [.35, .35, .5, .2, .13, .13];
 const LEAD = .6;
+const BEAT0 = 23, BEAT = .481;                    // the music's kick grid in film time (first kick = the drop)
 
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -357,7 +363,12 @@ const shots = [...document.querySelectorAll('.shot')];
 function addShot(tag, n, ext) {             // a still is used as soon as it loads; a clip, if present, replaces it
   return new Promise(done => {
     const el = document.createElement(tag), url = `assets/s${n}.${ext}`;
-    const use = () => { if (M[n]) M[n].remove(); shots[n - 1].appendChild(el); M[n] = el; done(); };
+    const use = () => {
+      if (M[n]) M[n].remove();
+      shots[n - 1].appendChild(el); M[n] = el;
+      shots[n - 1].classList.toggle('gl', tag === 'img' && !!fx && fx.add(n, el));
+      done();
+    };
     if (tag === 'video') {
       el.muted = true; el.loop = true; el.playsInline = true; el.preload = 'auto'; el.setAttribute('muted', ''); el.setAttribute('playsinline', '');
       el.src = url; use();
@@ -482,6 +493,235 @@ function draw(t) {
   if (sa > .002) sphere(W / 2, H * lerp(.40, .30, out), m * .27 * lerp(1, 1.5, out), sa, t);
 }
 
+/* ---------- living stills ---------- */
+// The scene stills are drawn by one shader that keeps them moving: drifting haze and nebula, shimmering corona,
+// pulsing gold, dust and embers, lasers and a crowd that bounce on the kick. Coordinates are in image space
+// (x right, y down, 0..1). Without WebGL the plain stills are shown instead.
+const FRAG = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+varying vec2 vUv;
+uniform sampler2D uA, uB;
+uniform vec3 uSA, uSB;            // scene number, seconds into the scene, 1 if it is drawn here
+uniform float uMix, uT, uBeat;
+uniform vec2 uView, uRes;
+const float AR = 1.7768;          // image height / width
+const vec3 GOLD = vec3(1., .74, .36);
+const vec3 VIOLET = vec3(.62, .34, 1.);
+
+float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float noise(vec2 p) {
+  vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
+  return mix(mix(hash(i), hash(i + vec2(1., 0.)), f.x), mix(hash(i + vec2(0., 1.)), hash(i + vec2(1., 1.)), f.x), f.y);
+}
+float fbm(vec2 p) { float v = 0., a = .5; for (int i = 0; i < 4; i++) { v += a * noise(p); p = p * 2.03 + 17.1; a *= .5; } return v; }
+vec2 flow(vec2 p, float t) { return vec2(fbm(p + vec2(t, 0.)), fbm(p + vec2(4.7, 1.3 - t))) - .5; }
+float fall(float lo, float hi, float x) { return 1. - smoothstep(lo, hi, x); }
+float lum(vec3 c) { return dot(c, vec3(.299, .587, .114)); }
+vec2 asp(vec2 d) { return vec2(d.x, d.y * AR); }
+// small twinkling points on a grid of n cells per image width, drifting with velocity v
+float motes(vec2 uv, float t, float n, vec2 v) {
+  vec2 q = (asp(uv) + v * t) * n, i = floor(q), f = fract(q);
+  float h = hash(i);
+  vec2 o = .25 + .5 * vec2(hash(i + 3.1), hash(i + 7.7));
+  return fall(0., .1, length(f - o)) * (.5 + .5 * sin(t * (1. + 3. * h) + h * 40.)) * step(.5, h);
+}
+// streamers flowing out of an eclipse of radius r0
+float corona(vec2 d, float r, float r0, float t) {
+  float m = smoothstep(r0 * .97, r0 * 1.08, r) * fall(r0 * 1.1, r0 * 3.2, r);
+  vec2 u = d / max(r, .001);
+  return m * (.6 * noise(u * 3.5 + t * .12) + .4 * noise(u * 8. + r * 5. - t * .25) - .42);
+}
+float ray(vec2 uv, vec2 o, float ang, float w) {
+  vec2 d = asp(uv - o), dir = vec2(cos(ang), sin(ang));
+  float al = dot(d, dir), pe = abs(d.x * dir.y - d.y * dir.x);
+  return fall(0., w * (1. + max(al, 0.) * 5.), pe) * smoothstep(0., .04, al) * exp(-max(al, 0.) * 2.2);
+}
+
+vec3 s1(sampler2D tx, vec2 p, float t) {            // the eclipse over the pyramids
+  vec2 c = vec2(.5, .398);
+  vec2 uv = c + (p - c) / (1. + .05 * smoothstep(0., 9., t));
+  vec2 d = asp(uv - c); float r = length(d);
+  float sky = fall(.42, .55, uv.y) * smoothstep(.16, .3, r);
+  uv += sky * .006 * flow(uv * 3., t * .06);
+  vec3 col = texture2D(tx, uv).rgb;
+  col *= 1. + 1.7 * corona(d, r, .119, t) + .1 * sin(t * 1.4) * fall(.12, .45, r);
+  float k = fract(t / 2.6), ring = fall(0., .02, abs(r - (.125 + k * .45))) * (1. - k) * (1. - k);
+  col += GOLD * ring * .3 * step(.3, t) * fall(.5, .6, uv.y);
+  float up = fall(.4, .62, uv.y) * smoothstep(.14, .2, r);
+  col += vec3(.9, .85, 1.) * motes(uv, t, 44., vec2(0.)) * up * .55;
+  float fog = smoothstep(.61, .69, uv.y) * fall(.70, .80, uv.y);
+  col += vec3(.42, .24, .5) * fog * fbm(vec2(uv.x * 2.6 - t * .05, uv.y * 12.)) * .3;
+  return col;
+}
+
+vec3 s2(sampler2D tx, vec2 p, float t) {            // the temple: walking towards the door
+  vec2 c = vec2(.505, .615);
+  vec2 uv = c + (p - c) / (1. + .085 * min(t, 9.) / 9.);
+  vec2 b1 = asp(uv - vec2(.175, .642)), b2 = asp(uv - vec2(.815, .642));
+  uv.x += (exp(-dot(b1, b1) / .0016) + exp(-dot(b2, b2) / .0016)) * .01 * (noise(vec2(uv.y * 60. + t * 7., uv.x * 9.)) - .5);
+  vec2 pd = asp(uv - vec2(.505, .59));
+  float door = fall(.04, .055, abs(pd.x)) * fall(.10, .125, abs(pd.y));
+  uv += door * .004 * flow(uv * 9., t * .25);
+  vec3 col = texture2D(tx, uv).rgb;
+  float L = lum(col), warm = smoothstep(.12, .4, col.r - col.b), vio = smoothstep(.04, .25, col.b - col.g);
+  float side = abs(uv.x - .505), wake = smoothstep(0., 5., t);
+  float run = .5 + .5 * sin(t * 2.4 + side * 15. - uv.y * 4.);
+  float glyph = warm * smoothstep(.3, .7, L) * smoothstep(.08, .2, side) * fall(.62, .7, uv.y);
+  col *= 1. + glyph * (.9 * wake * run * run - .35 * (1. - wake));
+  col *= 1. + .5 * (exp(-dot(b1, b1) / .03) * (noise(vec2(t * 9., 1.)) - .5) + exp(-dot(b2, b2) / .03) * (noise(vec2(t * 9., 7.)) - .5));
+  col += VIOLET * exp(-dot(pd, pd) / .012) * (.1 + .09 * sin(t * 2.1)) + col * vio * .35 * (.5 + .5 * sin(t * 2.1));
+  vec2 a = vec2(.75, .335), ab = asp(vec2(.55, .575) - a), ap = asp(uv - a);
+  float h = clamp(dot(ap, ab) / dot(ab, ab), 0., 1.), dist = length(ap - ab * h);
+  float beam = fall(0., .075, dist) * smoothstep(0., .15, h);
+  col += GOLD * beam * (fbm(vec2(dist * 40., h * 3. - t * .2)) - .3) * .22;
+  col += GOLD * motes(uv, t, 46., vec2(.012, .016)) * (beam * 1.1 + .12 * smoothstep(.25, .4, uv.y) * fall(.7, .9, uv.y));
+  float em = (fall(0., .05, abs(uv.x - .175)) + fall(0., .05, abs(uv.x - .815))) * smoothstep(.45, .6, uv.y) * fall(.6, .65, uv.y);
+  col += vec3(1., .6, .2) * motes(uv, t, 60., vec2(0., .05)) * em * .9;
+  return col;
+}
+
+vec3 s3(sampler2D tx, vec2 p, float t) {            // the android wakes
+  vec2 c = vec2(.47, .5);
+  vec2 uv = c + (p - c) / (1. + .05 * min(t, 9.) / 9. + .003 * sin(t * 1.2));
+  vec3 b0 = texture2D(tx, uv).rgb;
+  float neb = smoothstep(.02, .16, b0.b - b0.r);
+  uv += neb * .008 * flow(uv * 4., t * .09);
+  vec3 col = texture2D(tx, uv).rgb;
+  float L = lum(col), wake = smoothstep(0., 4., t);
+  float gold = smoothstep(.28, .6, col.r - col.b) * smoothstep(.35, .7, L);
+  float run = .5 + .5 * sin(t * 3.4 - length(asp(uv - vec2(.225, .505))) * 10.);
+  col += GOLD * gold * (.1 + .85 * run * run * run) * (.35 + .65 * wake);
+  col *= 1. + .1 * run * smoothstep(.05, .3, col.r - col.b) * wake;
+  col *= 1. + neb * smoothstep(.15, .5, L) * pow(noise(uv * 2.5 + vec2(t * 3., -t * 2.)), 4.) * 3.;
+  col += GOLD * motes(uv, t, 30., vec2(.004, .03)) * .5 * fall(.02, .1, col.r - col.b) * smoothstep(.15, .3, uv.y) * fall(.75, .9, uv.y);
+  return col;
+}
+
+vec3 s4(sampler2D tx, vec2 p, float t) {            // the show
+  vec2 c = vec2(.52, .62);
+  vec2 uv = c + (p - c) / (1.07 - .06 * smoothstep(0., 7., t) + .01 * uBeat);
+  uv.y += smoothstep(.66, .74, uv.y) * .0045 * uBeat * (.5 + noise(vec2(uv.x * 11., 2.)));
+  float haze = fall(0., .2, min(uv.x, 1. - uv.x)) * smoothstep(.56, .62, uv.y) * fall(.64, .68, uv.y);
+  uv += haze * .006 * flow(uv * 5., t * .2);
+  vec3 col = texture2D(tx, uv).rgb;
+  float L = lum(col), above = fall(.64, .68, uv.y);
+  col *= 1. + above * (smoothstep(.3, .75, L) * (.1 + .7 * uBeat) + .12 * uBeat);
+  float sw = t * 1.3;
+  vec3 las = VIOLET * (ray(uv, vec2(.335, .52), -1.57 + .55 * sin(sw), .004) + ray(uv, vec2(.69, .52), -1.57 - .55 * sin(sw + .6), .004));
+  las += GOLD * (ray(uv, vec2(.335, .52), -1.57 - .5 * sin(sw * .8 + 1.), .004) + ray(uv, vec2(.69, .52), -1.57 + .5 * sin(sw * .8 + 2.), .004));
+  las += VIOLET * (ray(uv, vec2(.215, .55), -1.2 + .5 * sin(sw * 1.1 + 2.), .005) + ray(uv, vec2(.8, .545), -1.94 - .5 * sin(sw * 1.1 + 3.), .005));
+  col += las * above * (.45 + .5 * uBeat);
+  col += vec3(1., .95, .9) * motes(uv, t * 2., 55., vec2(0.)) * smoothstep(.66, .68, uv.y) * fall(.72, .8, uv.y) * .7;
+  return col;
+}
+
+vec3 s5(sampler2D tx, vec2 p, float t) {            // the traveller at the pyramid
+  vec2 c = vec2(.5, .44);
+  vec2 uv = c + (p - c) / (1. + .045 * min(t, 8.) / 8.);
+  vec2 ck = asp(uv - vec2(.405, .652));
+  uv += exp(-dot(ck, ck) / .004) * vec2(.004 * sin(uv.y * 80. - t * 5.5), .003 * sin(uv.x * 60. - t * 6.5));
+  vec2 d = asp(uv - vec2(.5, .3)); float r = length(d);
+  float dust = smoothstep(.54, .6, uv.y) * fall(.63, .69, uv.y) * smoothstep(.1, .28, abs(uv.x - .5));
+  float sky = fall(.42, .52, uv.y) * smoothstep(.2, .32, r);
+  uv += (dust * .007 + sky * .005) * flow(uv * 3.5 + vec2(-t * .05, 0.), t * .07);
+  vec3 col = texture2D(tx, uv).rgb;
+  col *= 1. + 1.6 * corona(d, r, .083, t) + .1 * sin(t * 1.4) * fall(.1, .4, r);
+  float ground = smoothstep(.62, .7, uv.y) * fall(.8, .95, uv.y);
+  col += vec3(1., .68, .28) * smoothstep(.5, .85, fbm(vec2(uv.x * 2.5 - t * .5, uv.y * 34. + t * .1))) * ground * .13;
+  col += vec3(1., .8, .5) * motes(uv, t, 34., vec2(-.06, .005)) * smoothstep(.4, .6, uv.y) * fall(.75, .9, uv.y) * .4;
+  return col;
+}
+
+vec3 shade(float id, sampler2D tx, vec2 p, float t) {
+  if (id < 1.5) return s1(tx, p, t);
+  if (id < 2.5) return s2(tx, p, t);
+  if (id < 3.5) return s3(tx, p, t);
+  if (id < 4.5) return s4(tx, p, t);
+  return s5(tx, p, t);
+}
+void main() {
+  vec2 p = (vUv - .5) * uView + .5;
+  p += .003 * (vec2(noise(vec2(uT * .3, 1.)), noise(vec2(uT * .3, 9.))) - .5);
+  vec4 a = vec4(0.), b = vec4(0.);
+  if (uSA.z > .5 && uMix < .999) a = vec4(shade(uSA.x, uA, p, uSA.y), 1.);
+  if (uSB.z > .5 && uMix > .001) b = vec4(shade(uSB.x, uB, p, uSB.y), 1.);
+  vec4 o = mix(a, b, uMix);
+  if (uView.y > 1.) o *= smoothstep(0., .06, p.y) * fall(.94, 1., p.y);   // tall screen: the whole frame fits, its dark top and bottom melt into the page
+  o.rgb += (hash(vUv * uRes + fract(uT) * 91.) - .5) * .035 * o.a;
+  gl_FragColor = vec4(clamp(o.rgb, 0., 1.), o.a);
+}`;
+const fx = (() => {
+  const cv = $('#fx'), IMG = 941 / 1672, U = {}, tex = [];
+  let gl = null;
+  try { gl = cv.getContext('webgl', { premultipliedAlpha: true, antialias: false }); } catch (e) {}
+  if (!gl) return null;
+  try {
+    const prog = gl.createProgram();
+    const add = (type, src) => {
+      const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(s));
+      gl.attachShader(prog, s);
+    };
+    add(gl.VERTEX_SHADER, 'attribute vec2 a;varying vec2 vUv;void main(){vUv=vec2(a.x*.5+.5,.5-a.y*.5);gl_Position=vec4(a,0.,1.);}');
+    add(gl.FRAGMENT_SHADER, FRAG);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(prog));
+    gl.useProgram(prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    for (const n of ['uA', 'uB', 'uSA', 'uSB', 'uMix', 'uT', 'uBeat', 'uView', 'uRes']) U[n] = gl.getUniformLocation(prog, n);
+    gl.uniform1i(U.uA, 0); gl.uniform1i(U.uB, 1);
+  } catch (e) { console.warn('stills stay static:', e.message); return null; }
+  const texture = src => {
+    const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    if (src) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, src);
+    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(3));
+    return t;
+  };
+  const blank = texture(null);
+  let scale = 1, ema = 16, last = 0;
+  const api = {
+    ok: true,
+    has: n => !!tex[n],
+    add(n, img) { try { tex[n] = texture(img); return true; } catch (e) { return false; } },
+    clear() { last = 0; gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); },
+    // a, b: scene numbers of the outgoing and incoming still (0 = nothing), k: crossfade 0..1
+    draw(t, a, b, k, beat, now) {
+      const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
+      if (last) { ema += (Math.min(100, now - last) - ema) * .05; if (ema > 40 && scale > .45) { scale *= .75; ema = 20; } }   // slow phone: draw smaller
+      last = now;
+      const d = Math.min(2, devicePixelRatio || 1) * scale, q = Math.min(1, 1000 / (w * d));
+      const pw = Math.max(2, Math.round(w * d * q)), ph = Math.max(2, Math.round(h * d * q));
+      if (pw !== cv.width || ph !== cv.height) { cv.width = pw; cv.height = ph; }
+      gl.viewport(0, 0, pw, ph);
+      gl.uniform2f(U.uView, 1, IMG / (pw / ph));    // the frame always fits the width; never cropped at the sides
+      gl.uniform2f(U.uRes, pw, ph);
+      gl.uniform1f(U.uT, t); gl.uniform1f(U.uMix, k); gl.uniform1f(U.uBeat, beat);
+      gl.uniform3f(U.uSA, a, t - T0[a], tex[a] ? 1 : 0); gl.uniform3f(U.uSB, b, t - T0[b], tex[b] ? 1 : 0);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex[a] || blank);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tex[b] || blank);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    },
+  };
+  cv.addEventListener('webglcontextlost', e => { e.preventDefault(); api.ok = false; shots.forEach(el => el.classList.remove('gl')); });
+  return api;
+})();
+const T0 = [0, 1, 2, 3, 4, 5].map(k => k ? SC[SHOT.indexOf(k) - 1] : 0);   // film second at which each scene starts
+const still = k => !!(fx && fx.ok && fx.has(k) && M[k] && M[k].tagName === 'IMG');
+let fxA = 0, fxB = 0, fxAt = 0, fxDur = 1, filmT = 0;
+function paint(t, now) {
+  if (!fx || !fx.ok) return;
+  const m = Math.min(1, Math.max(0, (t - fxAt) / fxDur));
+  fx.draw(t, still(fxA) ? fxA : 0, still(fxB) ? fxB : 0, m * m * (3 - 2 * m), t >= BEAT0 ? Math.exp(-((t - BEAT0) % BEAT) * 7) : 0, now);
+}
+
 /* ---------- sound ---------- */
 let master = null, live = null;
 function wake() {                        // must run inside the tap: lets the phone play sound
@@ -588,6 +828,7 @@ function applyShot(n) {
   film.classList.toggle('media', media);
   shots.forEach((el, i) => el.classList.toggle('on', media && i + 1 === k));
   if (media && M[k].tagName === 'VIDEO' && M[k].paused) { M[k].currentTime = 0; M[k].play().catch(() => {}); }
+  if (k !== fxB) { fxA = fxB; fxB = k; fxAt = filmT; fxDur = !fxA ? (k === 1 ? 3.2 : 1) : n === 4 ? .15 : 1.4; }
 }
 function setScene(n) {
   scene = n; film.dataset.s = n;
@@ -598,7 +839,7 @@ function setScene(n) {
   if (n === 4) { flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go'); }
 }
 function tick(t) {
-  let n = 0;
+  let n = 0; filmT = t;
   for (let i = 0; i < SC.length; i++) if (t >= SC[i]) n = i + 1;
   if (n !== scene) setScene(n);
   else if (n && !!M[SHOT[n]] !== film.classList.contains('media')) applyShot(n);
@@ -616,6 +857,7 @@ async function startFilm() {
   cap.classList.remove('on'); clearTimeout(capT); flash.classList.remove('go'); bar.style.transform = 'scaleX(0)';
   void film.offsetWidth; film.classList.remove('reset');
   filmStart = null; video.pause();
+  fxA = fxB = 0; filmT = jump; if (fx && fx.ok) fx.clear();
   body.dataset.mode = 'film';
   // everything is normally loaded by the time of the tap; on a slow connection hold the dark screen briefly
   capT = setTimeout(() => { cap.textContent = 'RECEIVING SIGNAL…'; cap.classList.add('on'); }, 700);
@@ -628,7 +870,9 @@ async function startFilm() {
     if (!video.src) video.src = SRC.video;
     video.currentTime = 0; video.play().catch(() => finish(true));
   } else {
-    filmStart = performance.now() + LEAD * 1000 - jump * 1000;
+    // the picture waits for the sound to actually reach the speaker (matters with Bluetooth)
+    const lag = !jump && AC && AC.state === 'running' ? Math.min(.4, (AC.outputLatency || 0) + (AC.baseLatency || 0)) : 0;
+    filmStart = performance.now() + (LEAD + lag - jump) * 1000;
     if (!jump) startAudio();
   }
 }
@@ -645,7 +889,7 @@ video.addEventListener('timeupdate', () => { if (video.duration) bar.style.trans
 $('#open').addEventListener('click', startFilm);
 $('#replay').addEventListener('click', startFilm);
 $('#skip').addEventListener('click', () => finish(true));
-if (params.has('debug')) window.portal = { ready, mix, makeBus, buf, ac: AC, shots: M };
+if (params.has('debug')) window.portal = { ready, mix, makeBus, buf, ac: AC, shots: M, fx };
 
 /* ---------- loop ---------- */
 function frame(now) {
@@ -654,7 +898,7 @@ function frame(now) {
   stars(now / 1000);
   if (filmStart !== null) {
     const t = (now - filmStart) / 1000;
-    if (t >= 0) { tick(t); if (filmStart !== null) draw(t); }
+    if (t >= 0) { tick(t); if (filmStart !== null) { draw(t); paint(t, now); } }
   }
 }
 requestAnimationFrame(frame);
