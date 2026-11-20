@@ -57,9 +57,9 @@ body[data-mode="gate"] #gate,body[data-mode="film"] #film{opacity:1;visibility:v
 @keyframes pulse{from{transform:scale(1);opacity:.8}to{transform:scale(1.7);opacity:0}}
 
 /* film */
-#film video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;background:#000}
+#film>video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;background:#000}
 #film.video{background:#000}
-#film.video video{display:block}
+#film.video>video{display:block}
 #film.video>:not(video):not(#skip):not(.bar){display:none}
 #film.reset *{transition:none!important}
 .glyphs{position:absolute;display:grid;justify-items:center;align-items:center;font-family:'Noto Sans Egyptian Hieroglyphs',sans-serif;line-height:1;opacity:0;transition:opacity 1.6s ease}
@@ -71,29 +71,46 @@ body[data-mode="gate"] #gate,body[data-mode="film"] #film{opacity:1;visibility:v
 .glyphs-ready #film[data-s="2"] .glyphs,.glyphs-ready #film[data-s="3"] .glyphs.col{opacity:1}
 #film[data-s="2"] .glyphs span{color:var(--gold);text-shadow:0 0 12px rgba(233,187,108,.85)}
 #film[data-s="3"] .glyphs span{color:var(--violet-hi);text-shadow:0 0 14px rgba(139,77,255,.95)}
-.cap{position:absolute;left:0;right:0;bottom:17%;padding:0 30px 0 calc(30px + .3em);font-family:var(--display);font-size:clamp(13px,3.7vw,19px);letter-spacing:.3em;line-height:1.9;color:var(--gold-hi);text-shadow:0 0 18px rgba(233,187,108,.5);opacity:0;transform:translateY(10px);transition:opacity 1s ease,transform 1s ease}
+.cap{position:absolute;left:0;right:0;bottom:17%;padding:0 30px 0 calc(30px + .3em);font-family:var(--display);font-size:clamp(13px,3.7vw,19px);letter-spacing:.3em;line-height:1.9;color:var(--gold-hi);text-shadow:0 0 18px rgba(233,187,108,.5),0 2px 12px rgba(0,0,0,.9);opacity:0;transform:translateY(10px);transition:opacity 1s ease,transform 1s ease}
 .cap.on{opacity:1;transform:none}
 .flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 62%,#fff 0,#e3d0ff 22%,rgba(139,77,255,.5) 48%,transparent 78%);opacity:0;pointer-events:none}
 .flash.go{animation:flash 1.6s ease-out}
 @keyframes flash{0%{opacity:0}8%{opacity:.95}100%{opacity:0}}
 #film .pyr{position:absolute;left:0;bottom:0;transform:translateY(108%);transition:transform 3.2s cubic-bezier(.16,1,.3,1)}
 #film .ring{opacity:0;transform:translate(-50%,38%) scale(.3);transition:opacity 2s ease,transform 3s cubic-bezier(.16,1,.3,1)}
-#film:is([data-s="4"],[data-s="5"],[data-s="6"]) .pyr{transform:none}
-#film:is([data-s="4"],[data-s="5"],[data-s="6"]) .ring{opacity:1;transform:translate(-50%,38%)}
+#film:is([data-s="4"],[data-s="5"],[data-s="6"],[data-s="7"]) .pyr{transform:none}
+#film:is([data-s="4"],[data-s="5"],[data-s="6"],[data-s="7"]) .ring{opacity:1;transform:translate(-50%,38%)}
+#film.media :is(.glyphs,.pyr,.ring){opacity:0!important}
+.shot{position:absolute;inset:0;opacity:0;transition:opacity 1.4s ease;overflow:hidden}
+.shot[data-n="1"]{transition-duration:3.5s}
+.shot.on{opacity:1}
+.shot>*{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.shot.on>img{animation:kb var(--d,8s) linear both}
+@keyframes kb{from{transform:scale(var(--a,1)) translate(var(--ax,0),var(--ay,0))}to{transform:scale(var(--b,1.14)) translate(var(--bx,0),var(--by,0))}}
+.shade,.dim{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity 2.5s ease}
+.shade{background:linear-gradient(to bottom,rgba(7,5,13,.6),transparent 28%,transparent 52%,rgba(7,5,13,.88))}
+.dim{background:var(--bg)}
+#film.media .shade{opacity:1}
+#film.media:is([data-s="6"],[data-s="7"]) .dim{opacity:.5}
 .reveal{position:absolute;left:0;right:0;top:14vh;padding:0 18px}
-.reveal>*{opacity:0;transition:opacity 1.6s ease,transform 2.2s cubic-bezier(.16,1,.3,1)}
+.reveal>*,.final>*{opacity:0;transition:opacity 1.4s ease,transform 2.2s cubic-bezier(.16,1,.3,1)}
 .eyebrow,.r-open{font-family:var(--display);font-size:12px;letter-spacing:.42em;padding-left:.42em;color:var(--violet-hi)}
-.r-open{transition-delay:.5s}
 .title,.r-title{font-family:var(--display);font-weight:500;font-size:clamp(52px,16.5vw,112px);letter-spacing:.2em;padding-left:.2em;line-height:1.12}
-.r-title{transform:scale(1.3);transition-delay:.9s}
+.r-title{transform:scale(1.3)}
 .kicker,.r-sub{font-family:var(--display);font-size:clamp(12px,3.5vw,17px);letter-spacing:.34em;padding-left:.34em}
-.r-sub{transition-delay:2s}
+.r-open,.r-sub,.r-date{text-shadow:0 2px 14px rgba(0,0,0,.9)}
 .place,.r-date{margin-top:20px;font-family:var(--display);font-size:clamp(12px,3.4vw,16px);letter-spacing:.34em;padding-left:.34em;color:var(--gold);line-height:2}
 .place b,.r-date b{display:block;font-weight:500;font-size:clamp(20px,6vw,30px);letter-spacing:.2em;color:var(--gold-hi);line-height:1.4}
-.r-bday{margin-top:18px;font-style:italic;font-size:clamp(27px,8vw,44px);line-height:1.15;color:var(--gold-hi);text-shadow:0 0 22px rgba(233,187,108,.6);transform:translateY(12px)}
-#film:is([data-s="4"],[data-s="5"],[data-s="6"]) :is(.r-open,.r-title,.r-sub){opacity:1;transform:none}
-#film:is([data-s="5"],[data-s="6"]) .r-date{opacity:1}
-#film[data-s="6"] .r-bday{opacity:1;transform:none}
+.final{position:absolute;left:0;right:0;top:46%;transform:translateY(-50%);padding:0 22px}
+.final>*{transform:translateY(12px);font-style:italic;text-shadow:0 0 22px rgba(233,187,108,.5),0 2px 14px rgba(0,0,0,.9)}
+.f-1{font-size:clamp(30px,8.6vw,48px);line-height:1.15;color:var(--gold-hi)}
+.f-2{margin-top:18px;font-size:clamp(21px,5.8vw,30px);line-height:1.3}
+#film:is([data-s="4"],[data-s="5"]) .r-open{opacity:1;transition-delay:.5s}
+#film:is([data-s="4"],[data-s="5"]) .r-title{opacity:1;transform:none;transition-delay:.9s}
+#film:is([data-s="4"],[data-s="5"]) .r-sub{opacity:1;transition-delay:2s}
+#film[data-s="5"] .r-date{opacity:1}
+#film:is([data-s="6"],[data-s="7"]) .f-1{opacity:1;transform:none}
+#film[data-s="7"] .f-2{opacity:1;transform:none}
 #skip{position:absolute;top:max(18px,env(safe-area-inset-top));right:20px;z-index:2;padding:8px 6px;font-family:var(--display);font-size:11px;letter-spacing:.3em;opacity:.5}
 .bar{position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(233,187,108,.12);z-index:2}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold-lo),var(--gold-hi));transform-origin:0 50%;transform:scaleX(0)}
@@ -193,11 +210,18 @@ body.music[data-mode="main"] #snd{display:block}
 <!-- 2. Film -->
 <section id="film" class="layer" data-s="0">
   <video id="video" playsinline preload="none"></video>
+  <div class="shot" data-n="1" style="--d:9s;--a:1.02;--b:1.16"></div>
+  <div class="shot" data-n="2" style="--d:10s;--a:1.18;--b:1.06;--ax:-2%;--bx:2%"></div>
+  <div class="shot" data-n="3" style="--d:10s;--a:1.04;--b:1.2;--by:2%"></div>
+  <div class="shot" data-n="4" style="--d:9s;--a:1.32;--b:1.02"></div>
+  <div class="shot" data-n="5" style="--d:8s;--a:1.04;--b:1.14"></div>
   <div class="glyphs col l" data-n="18"></div>
   <div class="glyphs col r" data-n="18"></div>
   <div class="glyphs row" data-n="7"></div>
   <div class="ring"></div>
   <svg class="pyr" viewBox="0 0 800 400" preserveAspectRatio="xMidYMax meet"><use href="#pyramids"/></svg>
+  <div class="shade"></div>
+  <div class="dim"></div>
   <div class="flash"></div>
   <p class="cap" id="cap"></p>
   <div class="reveal">
@@ -205,7 +229,10 @@ body.music[data-mode="main"] #snd{display:block}
     <h2 class="r-title gold">ANYMA</h2>
     <p class="r-sub">LIVE AT THE PYRAMIDS</p>
     <p class="r-date">GIZA · EGYPT<b>26 MARCH 2027</b></p>
-    <p class="r-bday">Happy birthday, my sunshine</p>
+  </div>
+  <div class="final">
+    <p class="f-1">Happy Birthday, my sunshine.</p>
+    <p class="f-2">Our next adventure begins together. ♥</p>
   </div>
   <button id="skip" type="button">SKIP</button>
   <div class="bar"><i id="bar"></i></div>
@@ -279,16 +306,18 @@ body.music[data-mode="main"] #snd{display:block}
 (() => {
 /* ---------- settings ---------- */
 const EVENT = new Date('2027-03-26T00:00:00+02:00');
-// Optional files: drop them into assets/ and they are picked up automatically.
-// film.mp4 replaces the coded intro; music.mp3 replaces the built-in soundtrack; voice.mp3 plays on top.
-const SRC = { video: 'assets/film.mp4', music: 'assets/music.mp3', voice: 'assets/voice.mp3' };
-const CUES = [
-  [0,  'A SIGNAL HAS BEEN DETECTED'],
-  [7,  'SOME SECRETS WAIT THOUSANDS OF YEARS'],
-  [14, 'THE ANCIENT WORLD MEETS THE FUTURE'],
-  [22, ''], [29, ''], [32, '']
-];
-const END = 36;
+// Optional files in assets/ are picked up automatically:
+//   s1..s5 (.mp4 or .jpg)  footage or stills for the five scenes
+//   v1..v6.mp3             voice lines, started at VO_AT
+//   music.mp3              soundtrack instead of the built-in one (MUSIC_FROM = where to start in the file)
+//   film.mp4               one finished video instead of the whole intro
+const SRC = { video: 'assets/film.mp4', music: 'assets/music.mp3' };
+const MUSIC_FROM = 0;
+const SC = [0, 7, 15, 23, 26, 30, 33];            // start times of film states 1..7
+const SHOT = [0, 1, 2, 3, 4, 4, 5, 5];            // film state -> scene footage
+const CAPS = ['A SIGNAL HAS BEEN DETECTED', 'SOME SECRETS HAVE WAITED THOUSANDS OF YEARS', 'THE ANCIENT WORLD MEETS THE FUTURE'];
+const VO_AT = [1.4, 8.2, 16.2, 24.6, 30.9, 33.4];
+const END = 36.5;
 
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -303,12 +332,24 @@ const params = new URLSearchParams(location.search);
 const jump = +params.get('t') || 0;
 
 /* ---------- optional media ---------- */
-const has = {};
-if (location.protocol.startsWith('http')) {
-  for (const k in SRC) fetch(SRC[k], { method: 'HEAD' })
-    .then(r => { has[k] = r.ok && !/text\/html/.test(r.headers.get('content-type') || ''); })
-    .catch(() => {});
+const has = {}, M = [], voRaw = [], voBuf = [];
+const http = location.protocol.startsWith('http');
+const okRes = r => r.ok && !/text\/html/.test(r.headers.get('content-type') || '');
+const probe = url => http ? fetch(url, { method: 'HEAD' }).then(okRes).catch(() => false) : Promise.resolve(false);
+for (const k in SRC) probe(SRC[k]).then(ok => { has[k] = ok; });
+const shots = [...document.querySelectorAll('.shot')];
+function addShot(tag, n, ext) {
+  const el = document.createElement(tag);
+  if (tag === 'video') { el.muted = true; el.loop = true; el.playsInline = true; el.preload = 'auto'; el.setAttribute('muted', ''); el.setAttribute('playsinline', ''); }
+  else el.alt = '';
+  el.src = `assets/s${n}.${ext}`;
+  shots[n - 1].appendChild(el); M[n] = el;
 }
+for (let n = 1; n <= 5; n++) probe(`assets/s${n}.mp4`).then(ok => ok ? addShot('video', n, 'mp4')
+  : probe(`assets/s${n}.jpg`).then(ok2 => { if (ok2) addShot('img', n, 'jpg'); }));
+VO_AT.forEach((_, i) => {
+  voRaw[i] = http ? fetch(`assets/v${i + 1}.mp3`).then(r => okRes(r) ? r.arrayBuffer() : null).catch(() => null) : Promise.resolve(null);
+});
 
 /* ---------- glyphs ---------- */
 const G = [...'𓂀𓋹𓇳𓆣𓅓𓃭𓆓𓈖𓂋𓇋𓅱𓊹𓎛𓁹𓄿𓆑𓋴'];
@@ -382,7 +423,7 @@ const SP = [], SE = [];
 }
 function sphere(cx, cy, R, a, t) {
   const ry = t * .42, rx = .38, cY = Math.cos(ry), sY = Math.sin(ry), cX = Math.cos(rx), sX = Math.sin(rx);
-  const grow = sm(14.4, 18.5, t) * 1.12;
+  const grow = sm(15.4, 19.5, t) * 1.12;
   const g = ctx.createRadialGradient(cx, cy, R * .2, cx, cy, R * 2.1);
   g.addColorStop(0, `rgba(139,77,255,${.3 * a})`); g.addColorStop(.5, `rgba(139,77,255,${.14 * a})`); g.addColorStop(1, 'rgba(139,77,255,0)');
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 2.1, 0, TAU); ctx.fill();
@@ -412,23 +453,48 @@ function sphere(cx, cy, R, a, t) {
 }
 
 function draw(t) {
+  if (film.classList.contains('media')) return;
   const m = Math.min(W, H);
-  const ea = sm(.6, 3.2, t) * (1 - sm(14, 15.6, t));
+  const ea = sm(.6, 3.2, t) * (1 - sm(15, 16.6, t));
   if (ea > .002) { const k = sm(7, 10, t); eclipse(W / 2, H * lerp(.40, .36, k), m * lerp(.2, .165, k), ea, t); }
-  const out = sm(22, 23.2, t), sa = sm(14.4, 16.5, t) * (1 - out);
+  const out = sm(23, 24.2, t), sa = sm(15.4, 17.5, t) * (1 - out);
   if (sa > .002) sphere(W / 2, H * lerp(.40, .30, out), m * .27 * lerp(1, 1.5, out), sa, t);
 }
 
 /* ---------- sound ---------- */
-let AC, master, musicEl, voiceEl;
-function synth(lead) {
-  const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return;
+let AC, master, musicEl, voiceGain;
+function ensureAC() {
+  const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return null;
   try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
   AC = AC || new Ctx(); AC.resume();
+  return AC;
+}
+function startVoice(lead) {
+  const ac = ensureAC(); if (!ac) return;
+  const t0 = ac.currentTime + lead, g = ac.createGain();
+  g.gain.value = 1.25; g.connect(ac.destination); voiceGain = g;
+  VO_AT.forEach(async (at, i) => {
+    try {
+      if (!voBuf[i]) {
+        const raw = await voRaw[i]; if (!raw) return;
+        voBuf[i] = await new Promise((res, rej) => ac.decodeAudioData(raw.slice(0), res, rej));
+      }
+      if (voiceGain !== g) return;
+      const s = ac.createBufferSource(); s.buffer = voBuf[i]; s.connect(g); s.start(Math.max(ac.currentTime, t0 + at));
+    } catch (e) {}
+  });
+}
+function cutVoice() {
+  if (!voiceGain) return;
+  try { voiceGain.gain.value = 0; voiceGain.disconnect(); } catch (e) {}
+  voiceGain = null;
+}
+function synth(lead) {
+  if (!ensureAC()) return;
   const t0 = AC.currentTime + lead, at = s => t0 + s;
   const out = AC.createGain(); master = out;
   out.gain.setValueAtTime(.0001, t0); out.gain.exponentialRampToValueAtTime(.85, at(2));
-  out.gain.setValueAtTime(.85, at(33.5)); out.gain.exponentialRampToValueAtTime(.0001, at(38.5));
+  out.gain.setValueAtTime(.85, at(34.5)); out.gain.exponentialRampToValueAtTime(.0001, at(39.5));
   const comp = AC.createDynamicsCompressor(); out.connect(comp); comp.connect(AC.destination);
   const echo = AC.createDelay(1), fb = AC.createGain(), elp = AC.createBiquadFilter();
   echo.delayTime.value = .375; fb.gain.value = .42; elp.type = 'lowpass'; elp.frequency.value = 2600;
@@ -441,43 +507,44 @@ function synth(lead) {
 
   // pad: A minor, opens up towards the reveal
   const plp = AC.createBiquadFilter(), pg = AC.createGain(); plp.type = 'lowpass'; plp.Q.value = 1.2;
-  plp.frequency.setValueAtTime(240, t0); plp.frequency.linearRampToValueAtTime(520, at(14));
-  plp.frequency.exponentialRampToValueAtTime(2600, at(22)); plp.frequency.exponentialRampToValueAtTime(1100, at(22.6));
-  plp.frequency.linearRampToValueAtTime(1900, at(33));
+  plp.frequency.setValueAtTime(240, t0); plp.frequency.linearRampToValueAtTime(520, at(15));
+  plp.frequency.exponentialRampToValueAtTime(2600, at(23)); plp.frequency.exponentialRampToValueAtTime(1100, at(23.6));
+  plp.frequency.linearRampToValueAtTime(1900, at(34));
   pg.gain.value = .5; plp.connect(pg); pg.connect(out);
   [110, 164.81, 220, 261.63, 329.63].forEach((f, i) => [-4, 4].forEach(c => {
     const o = AC.createOscillator(), g = AC.createGain(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = c + i;
-    g.gain.value = .055; o.connect(g); g.connect(plp); o.start(t0); o.stop(at(39));
+    g.gain.value = .055; o.connect(g); g.connect(plp); o.start(t0); o.stop(at(40));
   }));
   // scene 1: signal pings
   [.8, 1.8, 2.8, 4.8, 5.3].forEach(s => tone('sine', 1760, s, .09, .01, .5, [out, echo]));
   // scene 2: bells
-  [440, 659.25, 523.25, 493.88, 440, 659.25, 783.99].forEach((f, i) => tone('triangle', f, 7 + i, .07, .02, 1.4, [out, echo]));
+  [440, 659.25, 523.25, 493.88, 440, 659.25, 783.99, 659.25].forEach((f, i) => tone('triangle', f, 7 + i, .07, .02, 1.4, [out, echo]));
   // scene 3: pulse builds, riser
   const kick = (s, peak) => { const o = AC.createOscillator(), g = AC.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(190, at(s)); o.frequency.exponentialRampToValueAtTime(48, at(s + .13)); env(g, s, peak, .004, .26); o.connect(g); g.connect(out); o.start(at(s)); o.stop(at(s + .35)); };
   const hat = (s, peak) => { const h = noise(s, .06, 'highpass', 7000); env(h.g, s, peak, .002, .05); };
-  for (let s = 14; s < 22; s += .5) { const k = (s - 14) / 8; kick(s, .12 + .4 * k); if (s >= 18) hat(s + .25, .03 + .05 * k); }
-  const rise = noise(14, 8, 'bandpass', 300); rise.fl.Q.value = 1.5;
-  rise.fl.frequency.setValueAtTime(300, at(14)); rise.fl.frequency.exponentialRampToValueAtTime(6000, at(22));
-  rise.g.gain.setValueAtTime(.0001, at(14)); rise.g.gain.exponentialRampToValueAtTime(.16, at(21.9)); rise.g.gain.exponentialRampToValueAtTime(.0001, at(22.04));
+  for (let s = 15; s < 23; s += .5) { const k = (s - 15) / 8; kick(s, .12 + .4 * k); if (s >= 19) hat(s + .25, .03 + .05 * k); }
+  const rise = noise(15, 8, 'bandpass', 300); rise.fl.Q.value = 1.5;
+  rise.fl.frequency.setValueAtTime(300, at(15)); rise.fl.frequency.exponentialRampToValueAtTime(6000, at(23));
+  rise.g.gain.setValueAtTime(.0001, at(15)); rise.g.gain.exponentialRampToValueAtTime(.16, at(22.9)); rise.g.gain.exponentialRampToValueAtTime(.0001, at(23.04));
   // scene 4: the drop
-  const boom = noise(22, 2.2, 'lowpass', 3200); env(boom.g, 22, .4, .005, 2);
+  const boom = noise(23, 2.2, 'lowpass', 3200); env(boom.g, 23, .4, .005, 2);
   const sub = AC.createOscillator(), sg = AC.createGain(); sub.type = 'sine';
-  sub.frequency.setValueAtTime(180, at(22)); sub.frequency.exponentialRampToValueAtTime(45, at(23)); env(sg, 22, .6, .005, 1.4);
-  sub.connect(sg); sg.connect(out); sub.start(at(22)); sub.stop(at(23.6));
+  sub.frequency.setValueAtTime(180, at(23)); sub.frequency.exponentialRampToValueAtTime(45, at(24)); env(sg, 23, .6, .005, 1.4);
+  sub.connect(sg); sg.connect(out); sub.start(at(23)); sub.stop(at(24.6));
   const blp = AC.createBiquadFilter(); blp.type = 'lowpass'; blp.frequency.value = 700; blp.connect(out);
-  for (let s = 22; s < 32; s += .5) { kick(s, .55); hat(s + .25, .07); tone('sawtooth', 110, s + .25, .13, .005, .18, [blp]); }
+  for (let s = 23; s < 30; s += .5) { kick(s, .55); hat(s + .25, .07); tone('sawtooth', 110, s + .25, .13, .005, .18, [blp]); }
   const alp = AC.createBiquadFilter(); alp.type = 'lowpass'; alp.frequency.value = 3000; alp.connect(out); alp.connect(echo);
   const arp = [440, 523.25, 659.25, 880, 659.25, 523.25, 659.25, 987.77];
-  for (let i = 0, s = 22; s < 35; s += .125, i++) tone('square', arp[i % 8], s, s < 32 ? .035 : .028, .005, .11, [alp]);
+  for (let i = 0, s = 23; s < 36; s += .125, i++) tone('square', arp[i % 8], s, s < 30 ? .035 : .024, .005, .11, [alp]);
 }
 function startAudio(lead) {
   if (has.music) {
-    musicEl = musicEl || new Audio(SRC.music);
-    musicEl.currentTime = 0; musicEl.volume = 1; musicEl.play().catch(() => {});
+    musicEl = musicEl || new Audio(SRC.music + '#t=' + MUSIC_FROM);
+    try { musicEl.currentTime = MUSIC_FROM; } catch (e) {}
+    musicEl.volume = 1; musicEl.play().catch(() => {});
     body.classList.add('music');
   } else synth(lead);
-  if (has.voice) { voiceEl = voiceEl || new Audio(SRC.voice); voiceEl.currentTime = 0; voiceEl.play().catch(() => {}); }
+  startVoice(lead);
 }
 function cutSynth() {
   if (!AC || !master) return;
@@ -488,26 +555,35 @@ function cutSynth() {
 
 /* ---------- film timeline ---------- */
 let filmStart = null, scene = 0, capT = 0;
+function applyShot(n) {
+  const k = SHOT[n], media = !!M[k];
+  film.classList.toggle('media', media);
+  shots.forEach((el, i) => el.classList.toggle('on', media && i + 1 === k));
+  if (media && M[k].tagName === 'VIDEO' && M[k].paused) { M[k].currentTime = 0; M[k].play().catch(() => {}); }
+}
 function setScene(n) {
   scene = n; film.dataset.s = n;
+  applyShot(n);
   cap.classList.remove('on'); clearTimeout(capT);
-  const txt = n ? CUES[n - 1][1] : '';
+  const txt = CAPS[n - 1];
   if (txt) capT = setTimeout(() => { cap.textContent = txt; cap.classList.add('on'); }, 900);
   if (n === 4) { flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go'); }
 }
 function tick(t) {
   let n = 0;
-  for (let i = 0; i < CUES.length; i++) if (t >= CUES[i][0]) n = i + 1;
+  for (let i = 0; i < SC.length; i++) if (t >= SC[i]) n = i + 1;
   if (n !== scene) setScene(n);
-  const next = n < CUES.length ? CUES[n][0] : END;
-  if (t > next - 1.1) cap.classList.remove('on');
+  else if (n && !!M[SHOT[n]] !== film.classList.contains('media')) applyShot(n);
+  if (n <= 3 && t > SC[n] - 1.1) cap.classList.remove('on');
   bar.style.transform = `scaleX(${Math.min(1, t / END)})`;
   if (t >= END) finish(false);
 }
 function startFilm() {
   scrollTo(0, 0);
-  cutSynth(); if (voiceEl) voiceEl.pause();
+  cutSynth(); cutVoice();
   film.classList.add('reset'); film.dataset.s = 0; scene = 0;
+  film.classList.remove('media'); shots.forEach(el => el.classList.remove('on'));
+  M.forEach(el => { if (el && el.tagName === 'VIDEO') el.pause(); });
   cap.classList.remove('on'); flash.classList.remove('go'); bar.style.transform = 'scaleX(0)';
   void film.offsetWidth; film.classList.remove('reset');
   const useVideo = !!has.video;
@@ -525,8 +601,8 @@ function startFilm() {
 function finish(skipped) {
   if (body.dataset.mode === 'main') return;
   filmStart = null; video.pause();
-  if (skipped) cutSynth();
-  if (voiceEl && skipped) voiceEl.pause();
+  if (skipped) { cutSynth(); cutVoice(); }
+  M.forEach(el => { if (el && el.tagName === 'VIDEO') el.pause(); });
   if (musicEl) musicEl.volume = .45;
   body.dataset.mode = 'main'; scrollTo(0, 0);
 }
