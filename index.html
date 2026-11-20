@@ -313,11 +313,11 @@ const EVENT = new Date('2027-03-26T00:00:00+02:00');
 //   film.mp4               one finished video instead of the whole intro
 const SRC = { video: 'assets/film.mp4', music: 'assets/music.mp3' };
 const MUSIC_FROM = 0;
-const SC = [0, 7, 15, 23, 26, 30, 33];            // start times of film states 1..7
+const SC = [0, 7, 15, 23, 26, 30, 33.6];          // start times of film states 1..7
 const SHOT = [0, 1, 2, 3, 4, 4, 5, 5];            // film state -> scene footage
 const CAPS = ['A SIGNAL HAS BEEN DETECTED', 'SOME SECRETS HAVE WAITED THOUSANDS OF YEARS', 'THE ANCIENT WORLD MEETS THE FUTURE'];
-const VO_AT = [1.4, 8.2, 16.2, 24.6, 30.9, 33.4];
-const END = 36.5;
+const VO_AT = [1.4, 8.2, 16.2, 24.6, 30.6, 33.8];
+const END = 37.8;
 
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -462,17 +462,23 @@ function draw(t) {
 }
 
 /* ---------- sound ---------- */
-let AC, master, musicEl, voiceGain;
+let AC, bus, master, musicEl, voiceGain;
 function ensureAC() {
   const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return null;
   try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
-  AC = AC || new Ctx(); AC.resume();
+  if (!AC) {
+    AC = new Ctx();
+    bus = AC.createDynamicsCompressor();   // shared limiter so voice + music never clip
+    bus.threshold.value = -4; bus.knee.value = 4; bus.ratio.value = 16; bus.attack.value = .003; bus.release.value = .15;
+    bus.connect(AC.destination);
+  }
+  AC.resume();
   return AC;
 }
 function startVoice(lead) {
   const ac = ensureAC(); if (!ac) return;
   const t0 = ac.currentTime + lead, g = ac.createGain();
-  g.gain.value = 1.25; g.connect(ac.destination); voiceGain = g;
+  g.gain.value = 1.1; g.connect(bus); voiceGain = g;
   VO_AT.forEach(async (at, i) => {
     try {
       if (!voBuf[i]) {
@@ -493,9 +499,9 @@ function synth(lead) {
   if (!ensureAC()) return;
   const t0 = AC.currentTime + lead, at = s => t0 + s;
   const out = AC.createGain(); master = out;
-  out.gain.setValueAtTime(.0001, t0); out.gain.exponentialRampToValueAtTime(.85, at(2));
-  out.gain.setValueAtTime(.85, at(34.5)); out.gain.exponentialRampToValueAtTime(.0001, at(39.5));
-  const comp = AC.createDynamicsCompressor(); out.connect(comp); comp.connect(AC.destination);
+  out.gain.setValueAtTime(.0001, t0); out.gain.exponentialRampToValueAtTime(.6, at(2));
+  out.gain.setValueAtTime(.6, at(35.5)); out.gain.exponentialRampToValueAtTime(.0001, at(39.8));
+  const comp = AC.createDynamicsCompressor(); out.connect(comp); comp.connect(bus);
   const echo = AC.createDelay(1), fb = AC.createGain(), elp = AC.createBiquadFilter();
   echo.delayTime.value = .375; fb.gain.value = .42; elp.type = 'lowpass'; elp.frequency.value = 2600;
   echo.connect(elp); elp.connect(fb); fb.connect(echo); elp.connect(out);
